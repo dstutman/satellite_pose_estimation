@@ -1,4 +1,10 @@
 <launch>
-  <node name="spd_test_simulation" pkg="spd_simulations" type="test_simulation.py" output="screen">
-  </node>
+  <!-- Launch real-robot control -->
+  <!--<include file="$(find franka_control)/launch/franka_control.launch" pass_all_args="true" />-->
+
+  <!-- <node name="spd_simulation_controller" pkg="spd_simulations" type="simulation_controller.py" output="screen"></node> -->
+
+  <include file="$(find panda_moveit_config)/launch/demo_gazebo.launch">
+    <arg name="transmission" default="position"/>
+  </include>
 </launch>

@@ -1,4 +1,6 @@
 <launch>
-  <node name="spd_test_simulation" pkg="spd_simulations" type="test_simulation.py" output="screen">
+  <node name="spd_simulation_controller" pkg="spd_simulations" type="simulation_controller.py" output="screen">
   </node>
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+  </include>
 </launch>

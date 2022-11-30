@@ -1,0 +1,4 @@
+<launch>
+  <node name="spd_test_simulation" pkg="spd_simulations" type="test_simulation.py" output="screen">
+  </node>
+</launch>

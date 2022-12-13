@@ -1,0 +1,22 @@
+<launch>
+    <arg name="camera_name" default="galaxy_camera"/>
+    <arg name="camera_frame" default="camera_optical_frame"/>
+    <arg name="camera_sn" default="FDN21120492"/>
+
+    <node pkg="nodelet" type="nodelet" name="vision_nodelet" args="manager"
+          output="screen"/>
+    <node pkg="nodelet" type="nodelet" name="galaxy_camera"
+          args="load galaxy_camera/GalaxyCameraNodelet vision_nodelet"
+          output="screen">
+        <param name="image_width" value="1440"/>
+        <param name="image_height" value="1080"/>
+        <param name="pixel_format" value="bgr8"/>
+        <param name="camera_info_url" value=""/>
+        <param name="camera_frame_id" value="$(arg camera_frame)"/>
+        <param name="camera_sn" value="$(arg camera_sn)"/>
+        <param name="frame_rate" value="30."/>
+        <param name="exposure_auto" value="true"/>
+        <param name="enable_imu_trigger" value="false"/>
+    </node>
+
+</launch>

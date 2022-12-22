@@ -1,0 +1,16 @@
+FROM ros:noetic
+
+RUN mkdir ./catkin_ws
+COPY . ./catkin_ws/
+WORKDIR ./catkin_ws
+
+RUN apt-get update \
+        && apt-get install -y usbutils \
+	&& bash -c "source devel/setup.bash && rosdep install --from-paths src --ignore-src -r -y" \
+	&& rm -rf /var/lib/apt/lists*
+
+RUN bash -c "./vendor/galaxy_linux_installer/Galaxy_camera.run && rm -rf vendor/galaxy_camera_installer" 
+
+RUN bash -c "source devel/setup.bash && catkin_make"
+
+CMD ["/bin/bash", "-c", "source ./devel/setup.bash && roslaunch --wait galaxy_camera_launch mer2.launch"]

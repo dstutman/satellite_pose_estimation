@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/dstutman/Repos/satellite_pose_estimation/ros/devel/setup.sh

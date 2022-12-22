@@ -1,3 +1,6 @@
-[submodule "ros/src/galaxy_camera"]
-	path = ros/src/galaxy_camera
-	url = git@github.com:QiayuanLiao/galaxy_camera.git
+[submodule "robotics/daheng_camera/src/galaxy_camera"]
+	path = robotics/daheng_camera/src/galaxy_camera
+	url = https://github.com/QiayuanLiao/galaxy_camera.git
+[submodule "robotics/daheng_camera/vendor/galaxy_linux_installer"]
+	path = robotics/daheng_camera/vendor/galaxy_linux_installer
+	url = git@github.com:dstutman/galaxy_linux_installer

@@ -1,0 +1,22 @@
+\subsubsection usage Usage
+\verbatim
+<node name="galaxy_camera" pkg="galaxy_camera" type="galaxy_camera">
+  <param name="exposure_value" type="double" value="2000.0" />
+  <param name="exposure_min" type="double" value="100.0" />
+  <param name="exposure_max" type="double" value="4500.0" />
+  <param name="exposure_auto" type="bool" value="False" />
+  <param name="gain_value" type="double" value="2.0" />
+  <param name="gain_min" type="double" value="0.0" />
+  <param name="gain_max" type="double" value="16.0" />
+  <param name="gain_auto" type="bool" value="True" />
+  <param name="black_value" type="double" value="2.0" />
+  <param name="black_auto" type="bool" value="True" />
+  <param name="white_selector" type="int" value="0" />
+  <param name="white_value" type="double" value="1.0" />
+  <param name="white_auto" type="bool" value="True" />
+  <param name="gamma_param" type="double" value="5.0" />
+  <param name="contrast_param" type="int" value="5" />
+  <param name="improve_mode" type="int" value="3" />
+</node>
+\endverbatim
+

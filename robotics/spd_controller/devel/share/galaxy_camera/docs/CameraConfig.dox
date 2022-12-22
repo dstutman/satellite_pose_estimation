@@ -1,0 +1,21 @@
+\subsubsection parameters ROS parameters
+
+Reads and maintains the following parameters on the ROS server
+
+- \b "~exposure_value" : \b [double] Exposure time when not in auto mode min: 20.0, default: 2000.0, max: 1000000.0
+- \b "~exposure_min" : \b [double] Min exposure time(us) min: 20.0, default: 100.0, max: 1000000.0
+- \b "~exposure_max" : \b [double] Max exposure time(us) min: 20.0, default: 4500.0, max: 1000000.0
+- \b "~exposure_auto" : \b [bool] Auto exposure min: False, default: False, max: True
+- \b "~gain_value" : \b [double] Gain value(dB) when not in auto mode min: 0.0, default: 2.0, max: 16.0
+- \b "~gain_min" : \b [double] Min gain dB min: 0.0, default: 0.0, max: 16.0
+- \b "~gain_max" : \b [double] Max gain dB min: 0.0, default: 16.0, max: 16.0
+- \b "~gain_auto" : \b [bool] Auto Gain min: False, default: True, max: True
+- \b "~black_value" : \b [double] Black value when not in auto mode min: 0.0, default: 2.0, max: 16.0
+- \b "~black_auto" : \b [bool] Auto black level min: False, default: True, max: True
+- \b "~white_selector" : \b [int] White balance channel selector min: 0, default: 0, max: 2
+- \b "~white_value" : \b [double] White balance value(dB) when not in auto mode min: 1.0, default: 1.0, max: 7.9961
+- \b "~white_auto" : \b [bool] Auto white min: False, default: True, max: True
+- \b "~gamma_param" : \b [double] Gamma param min: 0.0, default: 5.0, max: 100.0
+- \b "~contrast_param" : \b [int] Contrast param min: 0, default: 5, max: 100
+- \b "~improve_mode" : \b [int] Image improve mode selector min: 0, default: 3, max: 3
+

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>galaxy_camera_launch</name>
+    <version>0.0.0</version>
+    <description>The galaxy_camera_launch package</description>
+
+    <maintainer email="todo@todo.local">qiayuan</maintainer>
+
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <exec_depend>galaxy_camera</exec_depend>
+</package>

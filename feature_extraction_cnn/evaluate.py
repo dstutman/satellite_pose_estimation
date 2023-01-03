@@ -1,34 +1,20 @@
-import os, json, cv2, numpy as np, matplotlib.pyplot as plt
+# This script loads in the saved network weights, and evaluates an input
+# image, visualizing keypoint predictions.
+import torch, torchvision
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2
+import os, json
+import PIL
 
-import torch
+from heapq import nlargest
+from utils import collate_fn
+
 from torch.utils.data import Dataset, DataLoader
-
-import torchvision
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.transforms import functional as F
 
-import albumentations as A
 
-import PIL
-import transforms, utils, engine, train
-from utils import collate_fn
-from engine import train_one_epoch, evaluate
-from heapq import nlargest
-
-# Image augmentations
-def train_transform():
-    return A.Compose([
-        A.Sequential([
-            A.RandomRotate90(p=1), # Random rotation of an image by 90 degrees zero or more times
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0) # Try with ImageNet statistics. If it doesn't work, recalculate means using our dataset.
-            # A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, brightness_by_max=True, always_apply=False, p=1), # Random change of brightness & contrast
-        ], p=1)
-    ],
-    keypoint_params=A.KeypointParams(format='xy'), # More about keypoint formats used in albumentations library read at https://albumentations.ai/docs/getting_started/keypoints_augmentation/
-    bbox_params=A.BboxParams(format='pascal_voc', label_fields=['bboxes_labels']) # Bboxes should have labels, read more here https://albumentations.ai/docs/getting_started/bounding_boxes_augmentation/
-    )
-
-# Dataset class
 class ClassDataset(Dataset):
     def __init__(self, root, transform=None, demo=False):                
         self.root = root
@@ -120,7 +106,7 @@ class ClassDataset(Dataset):
             # plt.imshow(vis_original)
             # plt.clf()
 
-            # img = cv2.normalize(img, None, 0, 1, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            img = cv2.normalize(img, None, 0, 1, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
         
         else:
@@ -157,20 +143,20 @@ class ClassDataset(Dataset):
     def __len__(self):
         return len(self.imgs_files)
 
+def get_model(num_keypoints, weights_path=None):
+    
+    anchor_generator = AnchorGenerator(sizes=(32, 64, 128, 256, 512), aspect_ratios=(0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0))
+    model = torchvision.models.detection.keypointrcnn_resnet50_fpn(pretrained=False,
+                                                                   pretrained_backbone=True,
+                                                                   num_keypoints=num_keypoints,
+                                                                   num_classes = 2, # Background is the first class, object is the second class
+                                                                   rpn_anchor_generator=anchor_generator)
 
-# Visualizing a random item from dataset
-KEYPOINTS_FOLDER_TRAIN = 'train_dataset'
-dataset = ClassDataset(KEYPOINTS_FOLDER_TRAIN, transform=train_transform(), demo=True)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_fn)
-
-iterator = iter(data_loader)
-batch = next(iterator)
-
-print("Original targets:\n", batch[3], "\n\n")
-print("Transformed targets:\n", batch[1])
-
-keypoints_classes_ids2names = {0: '1', 1: '2', 2: '3', 3: '4'}
-
+    if weights_path:
+        state_dict = torch.load(weights_path)
+        model.load_state_dict(state_dict)        
+        
+    return model
 
 def visualize(image, bboxes, keypoints, image_original=None, bboxes_original=None, keypoints_original=None):
     fontsize = 18
@@ -214,95 +200,16 @@ def visualize(image, bboxes, keypoints, image_original=None, bboxes_original=Non
 
     plt.imsave('outputs/test.png', image)
 
-def output(keypoints):
-    kp_out = {'keypoint_1': keypoints[0], 
-            'keypoint_2': keypoints[1],
-            'keypoint_3': keypoints[2],
-            'keypoint_4': keypoints[3]}
-    outfile = 'outputs/test.json'
-    with open(outfile, 'w') as f:
-        json.dump(f, kp_out)
+keypoints_classes_ids2names = {0: '1', 1: '2', 2: '3', 3: '4'}
 
-def plot_results(num_epochs, training_loss):
-    plt.plot(range(0, num_epochs), training_loss)
-    plt.xlabel("Number of Epochs")
-    plt.ylabel("Training Loss")
-    plt.title("Training Loss")
-    plt.savefig("outputs/test_loss.png")
-    plt.show()
-    plt.clf()
-        
-image = (batch[0][0].permute(1,2,0).numpy() * 255).astype(np.uint8)
-bboxes = batch[1][0]['boxes'].detach().cpu().numpy().astype(np.int32).tolist()
-
-keypoints = []
-for kps in batch[1][0]['keypoints'].detach().cpu().numpy().astype(np.int32).tolist():
-# for kp in batch[1][0]['keypoints'].detach().cpu().numpy().astype(np.int32).tolist():
-    # keypoints.append([kp[:2]])
-    keypoints.append([kp[:2] for kp in kps])
-
-image_original = (batch[2][0].permute(1,2,0).numpy() * 255).astype(np.uint8)
-bboxes_original = batch[3][0]['boxes'].detach().cpu().numpy().astype(np.int32).tolist()
-
-keypoints_original = []
-for kps in batch[3][0]['keypoints'].detach().cpu().numpy().astype(np.int32).tolist():
-# for kp in batch[3][0]['keypoints'].detach().cpu().numpy().astype(np.int32).tolist():
-    # keypoints.append([kp[:2]])
-    keypoints_original.append([kp[:2] for kp in kps])
-
-# visualize(image, bboxes, keypoints, image_original, bboxes_original, keypoints_original)
-# visualize(image, keypoints, image_original, keypoints_original)
-
-# Training model
-
-def get_model(num_keypoints, weights_path=None):
-    
-    anchor_generator = AnchorGenerator(sizes=(32, 64, 128, 256, 512), aspect_ratios=(0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0))
-    model = torchvision.models.detection.keypointrcnn_resnet50_fpn(pretrained=False,
-                                                                   pretrained_backbone=True,
-                                                                   num_keypoints=num_keypoints,
-                                                                   num_classes = 2, # Background is the first class, object is the second class
-                                                                   rpn_anchor_generator=anchor_generator)
-
-    if weights_path:
-        state_dict = torch.load(weights_path)
-        model.load_state_dict(state_dict)        
-        
-    return model
+KEYPOINTS_FOLDER_TEST = 'test_dataset'
+dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=None, demo=False)
+data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-KEYPOINTS_FOLDER_TRAIN = 'train_dataset'
-KEYPOINTS_FOLDER_TEST = 'test_dataset'
-
-dataset_train = ClassDataset(KEYPOINTS_FOLDER_TRAIN, transform=train_transform(), demo=False)
-dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=None, demo=False)
-
-data_loader_train = DataLoader(dataset_train, batch_size=5, shuffle=True, collate_fn=collate_fn)
-data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
-
-model = get_model(num_keypoints = 4)
+model = get_model(num_keypoints = 4, weights_path='keypointsrcnn_weights.pth')
 model.to(device)
 
-params = [p for p in model.parameters() if p.requires_grad]
-optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
-num_epochs = 10
-
-training_loss = []
-
-for epoch in range(num_epochs):
-    metric_logger = train_one_epoch(model, optimizer, data_loader_train, device, epoch, print_freq=1000)
-    training_loss.append(metric_logger.meters["loss_keypoint"].global_avg)
-    lr_scheduler.step()
-    evaluate(model, data_loader_test, device)
-
-    
-# Save model weights after training
-torch.save(model.state_dict(), 'keypointsrcnn_weights.pth')
-
-plot_results(num_epochs, training_loss)
-
-# Visualizing model predictions
 iterator = iter(data_loader_test)
 images, targets = next(iterator)
 images = list(image.to(device) for image in images)
@@ -318,31 +225,12 @@ scores = output[0]['scores'].detach().cpu().numpy()
 
 high_scores_idxs = nlargest(2, range(len(scores)), key=lambda idx: scores[idx])
 
-# high_scores_idxs = np.where(scores > 0)[0].tolist() # Indexes of boxes with scores > 0.7
-# post_nms_idxs = torchvision.ops.nms(output[0]['boxes'][high_scores_idxs], output[0]['scores'][high_scores_idxs], 0.3).cpu().numpy() # Indexes of boxes left after applying NMS (iou_threshold=0.3)
-
-# Below, in output[0]['keypoints'][high_scores_idxs][post_nms_idxs] and output[0]['boxes'][high_scores_idxs][post_nms_idxs]
-# Firstly, we choose only those objects, which have score above predefined threshold. This is done with choosing elements with [high_scores_idxs] indexes
-# Secondly, we choose only those objects, which are left after NMS is applied. This is done with choosing elements with [post_nms_idxs] indexes
-
 keypoints = []
-# for kp in output[0]['keypoints'][high_scores_idxs][post_nms_idxs].detach().cpu().numpy():
-    # keypoints.append([list(map(int, kp[:2]))])
 for kps in output[0]['keypoints'][high_scores_idxs].detach().cpu().numpy():
     keypoints.append([list(map(int, kp)) for kp in kps])
-# for kps in output[0]['keypoints'][high_scores_idxs][post_nms_idxs].detach().cpu().numpy():
-    # keypoints.append([list(map(int, kp[:2])) for kp in kps])
 
 bboxes = []
 for bbox in output[0]['boxes'][high_scores_idxs].detach().cpu().numpy():
     bboxes.append(list(map(int, bbox.tolist())))
-# for bbox in output[0]['boxes'][high_scores_idxs][post_nms_idxs].detach().cpu().numpy():
-#     bboxes.append(list(map(int, bbox.tolist())))
-    
 
 visualize(image, bboxes, keypoints)
-
-output(keypoints[0])
-
-
-

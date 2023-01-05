@@ -259,7 +259,7 @@ def get_model(num_keypoints, weights_path=None):
     
     anchor_generator = AnchorGenerator(sizes=(32, 64, 128, 256, 512), aspect_ratios=(0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0))
     model = torchvision.models.detection.keypointrcnn_resnet50_fpn(pretrained=False,
-                                                                   pretrained_backbone=True,
+                                                                   pretrained_backbone=False,
                                                                    num_keypoints=num_keypoints,
                                                                    num_classes = 2, # Background is the first class, object is the second class
                                                                    rpn_anchor_generator=anchor_generator)
@@ -286,7 +286,7 @@ model.to(device)
 params = [p for p in model.parameters() if p.requires_grad]
 optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
-num_epochs = 10
+num_epochs = 5
 
 training_loss = []
 
@@ -298,7 +298,7 @@ for epoch in range(num_epochs):
 
     
 # Save model weights after training
-torch.save(model.state_dict(), 'keypointsrcnn_weights.pth')
+torch.save(model.state_dict(), 'keypointsrcnn_weights_scratchtrain.pth')
 
 plot_results(num_epochs, training_loss)
 

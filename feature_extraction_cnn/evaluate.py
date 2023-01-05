@@ -26,6 +26,7 @@ class ClassDataset(Dataset):
     def __getitem__(self, idx):
         img_path = os.path.join(self.root, "images", self.imgs_files[idx])
         annotations_path = os.path.join(self.root, "annotations", self.annotations_files[idx])
+        self.img_name = self.imgs_files[idx]
 
         img_original = np.array(PIL.Image.open(img_path))
         # if np.shape(img_original)[1] == 3024:
@@ -147,7 +148,7 @@ def get_model(num_keypoints, weights_path=None):
     
     anchor_generator = AnchorGenerator(sizes=(32, 64, 128, 256, 512), aspect_ratios=(0.25, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0))
     model = torchvision.models.detection.keypointrcnn_resnet50_fpn(pretrained=False,
-                                                                   pretrained_backbone=True,
+                                                                   pretrained_backbone=False,
                                                                    num_keypoints=num_keypoints,
                                                                    num_classes = 2, # Background is the first class, object is the second class
                                                                    rpn_anchor_generator=anchor_generator)
@@ -158,7 +159,7 @@ def get_model(num_keypoints, weights_path=None):
         
     return model
 
-def visualize(image, bboxes, keypoints, image_original=None, bboxes_original=None, keypoints_original=None):
+def visualize(image, bboxes, keypoints, img_name, image_original=None, bboxes_original=None, keypoints_original=None):
     fontsize = 18
 
     for bbox in bboxes:
@@ -198,7 +199,15 @@ def visualize(image, bboxes, keypoints, image_original=None, bboxes_original=Non
         ax[1].set_title('Transformed image', fontsize=fontsize)
         plt.clf()
 
-    plt.imsave('outputs/test.png', image)
+    outpath = 'outputs/' + str(img_name)
+    plt.imsave(outpath, image)
+
+def save_output(keypoints, img_name):
+    kp_out = {'img_name': img_name,
+    'keypoints': keypoints}
+    outfile = 'outputs/' + str(img_name) + '.json'
+    with open(outfile, 'w') as f:
+        json.dump(kp_out, f)
 
 keypoints_classes_ids2names = {0: '1', 1: '2', 2: '3', 3: '4'}
 
@@ -229,8 +238,22 @@ keypoints = []
 for kps in output[0]['keypoints'][high_scores_idxs].detach().cpu().numpy():
     keypoints.append([list(map(int, kp)) for kp in kps])
 
+for bb_num, bb in enumerate(keypoints):
+    for i in range(0, len(bb)-1):
+        for j in range(i+1, len(bb)):
+            kp_diff = np.subtract(np.array(bb[i][:2]), np.array(bb[j][:2]))
+            if np.linalg.norm(kp_diff) < 25:
+                if abs(output[0]['keypoints_scores'][high_scores_idxs][bb_num][i]) > abs(output[0]['keypoints_scores'][high_scores_idxs][bb_num][j]):
+                    bb[j][0], bb[j][1], bb[j][2] = 0, 0, 0
+                else:
+                    bb[i][0], bb[i][1], bb[i][2] = 0, 0, 0
+
+
+
 bboxes = []
 for bbox in output[0]['boxes'][high_scores_idxs].detach().cpu().numpy():
     bboxes.append(list(map(int, bbox.tolist())))
 
-visualize(image, bboxes, keypoints)
+visualize(image, bboxes, keypoints, dataset_test.img_name)
+
+save_output(keypoints, dataset_test.img_name[:-4])

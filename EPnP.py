@@ -11,7 +11,7 @@ import constraintMatrix as cM
 import gaussOptimization as gOpt
 
 
-THRESHOLD_REPROJECTION_ERROR = 10
+THRESHOLD_REPROJECTION_ERROR = 1
 
 
 class EPnP(object):
@@ -25,11 +25,19 @@ class EPnP(object):
         M = self.compute_M_ver2(Ximg_pix)
         self.K = self.kernel_noise(M, 4)
         
+
+        
         errors = []
         Rt_sol, Cc_sol, Xc_sol, sc_sol, beta_sol = [], [], [], [], []
 
         K = self.K
         kernel = np.array([K.T[3], K.T[2], K.T[1], K.T[0]]).T
+        flag = np.iscomplex(kernel)
+        if True in flag:
+            error_best, Rt_best, Cc_best, Xc_best, sc_best, beta_best = 0, 0, 0, 0, 0, 0
+            flag = False
+            return error_best, Rt_best, Cc_best, Xc_best, flag, sc_best, beta_best 
+        
         L6_10 = cM.compute_L6_10(kernel)
         
         for i in range(2):
@@ -54,16 +62,20 @@ class EPnP(object):
         error_best = errors[best]
         Rt_best, Cc_best, Xc_best = Rt_sol[best], Cc_sol[best], Xc_sol[best]
         sc_best, beta_best = sc_sol[best], beta_sol[best]
+        flag = True
         
-        return error_best, Rt_best, Cc_best, Xc_best, sc_best, beta_best
+        return error_best, Rt_best, Cc_best, Xc_best, flag, sc_best, beta_best
     
     def efficient_pnp(self, Xworld, Ximg_pix, A):
-        error_best, Rt_best, Cc_best, Xc_best, _, _ = self.handle_general_EPnP(Xworld, Ximg_pix, A)
+        error_best, Rt_best, Cc_best, Xc_best, flag, _, _ = self.handle_general_EPnP(Xworld, Ximg_pix, A)
         
-        return error_best, Rt_best, Cc_best, Xc_best
+        return error_best, Rt_best, Cc_best, Xc_best, flag
         
     def efficient_pnp_gauss(self, Xworld, Ximg_pix, A):
-        error_best, Rt_best, Cc_best, Xc_best, sc_best, beta_best = self.handle_general_EPnP(Xworld, Ximg_pix, A)
+        error_best, Rt_best, Cc_best, Xc_best, flag, sc_best, beta_best = self.handle_general_EPnP(Xworld, Ximg_pix, A)
+        
+        if flag == False:
+           return error_best, Rt_best, Cc_best, Xc_best, flag 
  
         best = len(beta_best)
         if best == 1:
@@ -82,7 +94,7 @@ class EPnP(object):
         if err_opt < error_best:
             error_best, Rt_best, Cc_best, Xc_best = err_opt, Rt_opt, Cc_opt, Xc_opt
             
-        return error_best, Rt_best, Cc_best, Xc_best
+        return error_best, Rt_best, Cc_best, Xc_best, flag
         
     def optimize_betas_gauss_newton(self, Kernel, Beta0, Xw, U):
         n = len(Beta0)
@@ -115,7 +127,7 @@ class EPnP(object):
         X = np.concatenate((X, np.array([np.ones((self.n))])), axis=0)
         C = self.Cw.transpose()
         C = np.concatenate((C, np.array([np.ones((4))])), axis=0)
-        
+
         Alpha = np.matmul(np.linalg.inv(C), X)
         Alpha = Alpha.transpose()
         

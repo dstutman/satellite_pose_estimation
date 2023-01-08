@@ -1,6 +1,7 @@
 <launch>
   <node name="spd_controller" pkg="spd_controller" type="controller.py" output="screen"></node>
-  <node name="move_group" pkg="panda_moveit_config" type="move_group.launch" output="screen">
-    <arg name="load_gripper value="false"></arg>
-  </node>
+  <include file="$(find panda_moveit_config)/launch/move_group.launch" output="screen">
+    <arg name="load_gripper" value="false"/>
+    <arg name="load_robot_description" value="true"/>
+  </include>
 </launch>

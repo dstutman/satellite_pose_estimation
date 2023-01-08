@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Adapted from: https://github.com/frankaemika/franka_ros/blob/develop/franka_description/robots/panda/panda.urdf.xacro -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="panda">
+
+  <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
+
+  <xacro:arg name="arm_id" default="panda" />
+
+  <xacro:franka_robot arm_id="$(arg arm_id)"
+                      joint_limits="${xacro.load_yaml('$(find franka_description)/robots/panda/joint_limits.yaml')}">
+  </xacro:franka_robot>
+
+  <!-- Start adaptation -->
+  <xacro:include filename="$(find spd_controller)/robots/camera.xacro" />
+  <!-- End adaptation -->
+
+</robot>

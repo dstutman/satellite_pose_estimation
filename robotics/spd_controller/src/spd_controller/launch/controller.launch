@@ -1,7 +1,8 @@
 <launch>
   <node name="spd_controller" pkg="spd_controller" type="controller.py" output="screen"></node>
+  <param name="robot_description" command="xacro '$(find spd_controller)/robots/panda.urdf.xacro'" />
   <include file="$(find panda_moveit_config)/launch/move_group.launch" output="screen">
     <arg name="load_gripper" value="false"/>
-    <arg name="load_robot_description" value="true"/>
+    <arg name="load_robot_description" value="false"/>
   </include>
 </launch>

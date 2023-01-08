@@ -103,7 +103,7 @@ catkin_python_setup()
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES simulation
-  CATKIN_DEPENDS rospy
+  CATKIN_DEPENDS rospy xacro
 #  DEPENDS system_lib
 )
 
@@ -160,6 +160,11 @@ include_directories(
 catkin_install_python(PROGRAMS
   nodes/controller.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+## Robot descriptions (URDF, XACRO, ...)
+install(DIRECTORY robots
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
 ## Mark executables for installation

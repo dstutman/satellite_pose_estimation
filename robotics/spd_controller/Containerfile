@@ -1,16 +1,22 @@
 FROM ros:noetic
 
-RUN mkdir ./catkin_ws
-COPY . ./catkin_ws/
-WORKDIR ./catkin_ws
-
 RUN apt-get update \
-	&& apt-get install --no-install-recommends -y \
-		ros-noetic-moveit-commander \
-		ros-noetic-panda-moveit-config \
-	&& bash -c "source devel/setup.bash && rosdep install --from-paths src --ignore-src -r -y" \
-	&& rm -rf /var/lib/apt/lists*
+    && apt-get install --no-install-recommends -y \
+        ros-noetic-moveit-commander \
+        ros-noetic-panda-moveit-config \
+    && rm -rf /var/lib/apt/lists*
 
+RUN mkdir /catkin_ws
+WORKDIR /catkin_ws
+
+RUN mkdir -p /catkin_ws/src/spd_controller
+COPY devel /catkin_ws/devel
+COPY src/spd_controller/package.xml /catkin_ws/src/spd_controller/package.xml
+RUN apt-get update \
+    && bash -c "source devel/setup.bash && rosdep install --from-paths src --ignore-src -r -y" \
+    && rm -rf /var/lib/apt/lists*
+
+COPY src /catkin_ws/src
 RUN bash -c "source devel/setup.bash && catkin_make"
 
 CMD ["/bin/bash", "-c", "source ./devel/setup.bash && roslaunch --wait spd_controller controller.launch"]

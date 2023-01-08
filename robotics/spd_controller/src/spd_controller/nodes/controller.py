@@ -1,10 +1,17 @@
 #!/usr/bin/env python
+from time import sleep
+
+import numpy as np
+
 import rospy
 import moveit_commander
-import moveit_msgs.msg
-import geometry_msgs.msg
+import moveit_msgs
+import geometry_msgs
+import spd_controller.trajectories as trajectories
 
-from time import sleep
+# Configuration
+trajectory = trajectories.line(np.array([0, 0, 0]), np.array([0, 0, 1], np.array([1, 0, 0, 0])))
+num_trajectory_points = 10
 
 rospy.init_node("logger")
 rospy.loginfo("SPD test simulation starting...")
@@ -30,16 +37,11 @@ positions = [
     {"x": 0.5, "y": 0, "z": 0.5},
 ]
 
-for position in positions:
-    rospy.loginfo(f"Starting move to {position}...")
+for pose in trajectories.discrete_points(num_trajectory_points, trajectory):
+    rospy.loginfo(f"Starting move to: {pose.position}...")
 
     # Set target
-    target_pose = geometry_msgs.msg.Pose()
-    target_pose.position.x = position["x"]
-    target_pose.position.y = position["y"]
-    target_pose.position.z = position["z"]
-
-    group.set_pose_target(target_pose)
+    group.set_pose_target(pose.to_geom_msg())
 
     # Execute the motion
     plan = group.go(wait=True)

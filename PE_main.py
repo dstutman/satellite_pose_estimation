@@ -17,6 +17,8 @@ import EPnP
 import json
 import glob
 import time
+import quaternion
+import operator as op
 
 ## OUTPUTS
 # error = error of EPnP
@@ -27,60 +29,51 @@ import time
 
 class EPnPTest(object):
     def __init__(self):
+        # Set input folder
         self.files = glob.glob(os.getcwd() + '/input/annotations/*.json')       
- 
-        
+
+        ##### CAMERA DATA INPTU #####
         # Focal Length in m
         f = 0.026  
         # Camera data in pixels
         # Focal length
         fx = 18571.42857
         fy = 18571.428571
-        # Sensor Centroid
-        u0 = 2016
-        v0 = 1512
         # Sensor dimentions  
         width = 4032
         height = 3024
-        
+        # Sensor Centroid
+        u0 = width/2
+        v0 = height/2
+        # Camera Matrix
         self.m = fx/f
         self.A = np.array([[fx/self.m, 0, u0/self.m, 0], [0, fy/self.m, v0/self.m, 0], [0, 0, 1, 0]])
         
         self.epnp = EPnP.EPnP()
-
-
+        
 
     def load_test_data(self, i):
         
         # Load Image Key Points
         f = open(self.files[i])               
-        data = json.load(f)       
+        data = json.load(f)
         points = data['keypoints']
-        
         self.Ximg_pix, self.Xworld= [], []
-        
         for p in points[0]:
-            self.Ximg_pix.append([[p[0]], [p[1]]])
+            self.Ximg_pix.append([[p[0]], [p[1]]])  
         for p in points[1]:
-            self.Ximg_pix.append([[p[0]], [p[1]]])        
-        
-
-        data1 = sio.loadmat(os.getcwd() + '/input/input_data_noise.mat')
-        self.Rt = data1['Rt']
-        
-        # 3D Model Key Points
+            self.Ximg_pix.append([[p[0]], [p[1]]])
+            
+        ##### INPUT VIRTUAL 3D MODEL KEYPOINTS #####
         self.Xworld = [[[0], [0], [0]], [[0], [0], [-0.10]], [[0], [0.10], [-0.10]], [[0], [0.10], [0]],
                   [[0.30], [0], [0]], [[0.30], [0], [-0.10]], [[0.30], [0.10], [-0.10]], [[0.30], [0.10], [0]]]
 
-        
         # Remove key points which are not visisble from both image and model data
         N = [i for i in range(len(self.Ximg_pix)) if self.Ximg_pix[i] == [[0], [0]]]
-        
+        # Flag if number of key points is too small
         if len(N) > 4:
             return 0
         else: 
-        
-
             count = 0
             for j in range(len(N)):
                 self.Ximg_pix.pop(N[j]-count)
@@ -89,46 +82,55 @@ class EPnPTest(object):
 
             # Get length of key points
             self.n = len(self.Ximg_pix)
-            return 1
-            
+            return 1       
     
 
     def apply_EPnP(self):
         error, Rt, Cc, Xc, flag = self.epnp.efficient_pnp(np.array(self.Xworld), np.array(self.Ximg_pix)/self.m, self.A)
+        # Flag for Complex Numbers
         if flag == False:
             return flag
-#        self.plot_3d_reconstruction("EPnP (Old)", Xc)
-#        print("Error of EPnP: ", error)
-        self.R, self.T, dump = np.hsplit(Rt, np.array([3,6]))
-        print("Rotation of EPnP: \n", self.R)
-        print("Transposition of EPnP: \n", self.T)
+        # self.plot_3d_reconstruction("EPnP (Old)", Xc)
+        R, T, dump = np.hsplit(Rt, np.array([3,6]))
+        print("Rotation of EPnP: \n", R)
+        print("Transposition of EPnP: \n", T)
         print("Error of EPnP: \n", error)
+        return R, T, flag
         
     def apply_EPnP_Gauss(self):
         error, Rt, Cc, Xc, flag = self.epnp.efficient_pnp_gauss(np.array(self.Xworld), np.array(self.Ximg_pix)/self.m, self.A)
+        # Flag for Complex Numbers
         if flag == False:
             return flag
-#        self.plot_3d_reconstruction("EPnP (Gauss Newton)", Xc)
-#        print("Error of EPnP (Gauss Newton Optimization): ", error)
+        # self.plot_3d_reconstruction("EPnP (Gauss Newton)", Xc)
         R, T, dump = np.hsplit(Rt, np.array([3,6]))
         print("Rotation of EPnP (Gauss Newton Optimization): \n", R)
         print("Transposition of EPnP (Gauss Newton Optimization): \n", T)
         print("Error of EPnP (Gauss Newton Optimization): \n", error)
+        return R, T, flag
         
-    # def plot_3d_reconstruction(self, method, Xc):
-    #     fig = plt.figure()
-    #     fig.set_size_inches(18.5, 13)
-    #     axes = fig.add_subplot(1, 1, 1)
-    #     plt.plot(0, 0, 'ok')
-    #     # for p in self.Xcam:
-    #     #     plt.plot(p[0], p[1], '.r')
-    #     for p in Xc:
-    #         plt.plot(p[0], p[1], 'xg')
-    #     axes.set_title(method + ' - Reprojection Error', fontsize=18)
-    #     plt.grid()
+    def plot_3d_reconstruction(self, method, Xc):
+        fig = plt.figure()
+        fig.set_size_inches(18.5, 13)
+        axes = fig.add_subplot(1, 1, 1)
+        plt.plot(0, 0, 'ok')
+        for p in Xc:
+            plt.plot(p[0], p[1], 'xg')
+        axes.set_title(method + ' - Reprojection - Not in image plane', fontsize=18)
+        plt.grid()
+        plt.show()
         
-    #     fig.savefig(os.getcwd() + "/output/" + method + '_Reprojection_Error.png', dpi=100)
-        # plt.show()
+    def reprojection_error(self, R1, T1, R2, T2):
+        # Get translation Error
+        Te = list( map(op.sub, T1, T2) )
+        Te_v = np.concatenate( Te, axis=0 )
+        Te_abs = np.linalg.norm(Te_v)
+        Te_rel = (Te_abs/np.linalg.norm(R2))*100 
+        # Get rotation Error
+        q1 = quaternion.as_float_array(quaternion.from_rotation_matrix(R1))
+        q2 = quaternion.as_float_array(quaternion.from_rotation_matrix(R2))
+        qe_rel = (1-abs(np.dot(q1,q2)))*100 
+        return Te_rel, qe_rel
     
 
 if __name__ == "__main__":
@@ -138,11 +140,11 @@ if __name__ == "__main__":
     st = time.time()
     counter = 0
 
+    # Run pose estimation on all images in the folder
     while i < 100:
         dat_flag = ET.load_test_data(i)
         if dat_flag == 1:
             cpx_flag = ET.apply_EPnP()
-            ET.apply_EPnP_Gauss()
             if cpx_flag == False:
                 print("Complex numbers, data skipped")
                 counter += 1

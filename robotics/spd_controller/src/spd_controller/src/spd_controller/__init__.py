@@ -1,1 +1,1 @@
-import trajectories
+from . import trajectories

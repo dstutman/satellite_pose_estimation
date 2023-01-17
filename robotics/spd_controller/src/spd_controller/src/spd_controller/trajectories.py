@@ -1,16 +1,16 @@
-from numpy.typing import ArrayLike
-from typing import Callable, NamedTuple
-import geometry_msgs.msgs as msgs
+from typing import Callable, NamedTuple, Iterator, Any
+import rospy
+import geometry_msgs.msg as msg
 
 
-CartesianPoint = ArrayLike
-Quaterion = ArrayLike
+CartesianPoint = Any
+Quaterion = Any
 def Pose(NamedTuple):
     position: CartesianPoint
     orientation: Quaterion
 
-    def to_geom_msg(self: Pose) -> msgs.Pose:
-        pose_msg = msgs.Pose()
+    def to_geom_msg(self: Pose) -> msg.Pose:
+        pose_msg = msg.Pose()
         pose_msg.position.x = self.position[0]
         pose_msg.position.y = self.position[1]
         pose_msg.position.z = self.position[2]
@@ -44,7 +44,7 @@ A generator for discretizing trajectories. It uses the center side of each
 evenly spaced parameter (t) range. This also means it will never actually
 evaluate the endpoints (t=0. and t=1.)
 """
-def discrete_points(num_points: int, trajectory: Trajectory) -> iter[Pose]:
+def discrete_points(num_points: int, trajectory: Trajectory) -> Iterator[Pose]:
     assert num_points > 0
 
     current_point = 0

@@ -54,6 +54,8 @@
   <exec_depend>rospy</exec_depend>
   <exec_depend>franka_ros</exec_depend>
   <exec_depend>xacro</exec_depend>
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

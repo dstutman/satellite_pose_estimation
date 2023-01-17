@@ -6,11 +6,10 @@ import numpy as np
 import rospy
 import moveit_commander
 import moveit_msgs
-import geometry_msgs
 import spd_controller.trajectories as trajectories
 
 # Configuration
-trajectory = trajectories.line(np.array([0, 0, 0]), np.array([0, 0, 1], np.array([1, 0, 0, 0])))
+trajectory = trajectories.line_generator(np.array([0, 0, 0]), np.array([0, 0, 1]), np.array([1, 0, 0, 0]))
 num_trajectory_points = 10
 
 rospy.init_node("logger")

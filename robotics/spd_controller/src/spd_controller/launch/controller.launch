@@ -1,8 +1,11 @@
 <launch>
-  <node name="spd_controller" pkg="spd_controller" type="controller.py" output="screen"></node>
+  <arg name="transmission" value="effort" />
+
+  <node name="spd_controller" pkg="spd_controller" type="controller.py"></node>
   <param name="robot_description" command="xacro '$(find spd_controller)/robots/panda.urdf.xacro'" />
-  <include file="$(find panda_moveit_config)/launch/move_group.launch" output="screen">
+  <include file="$(find panda_moveit_config)/launch/move_group.launch">
     <arg name="load_gripper" value="false"/>
     <arg name="load_robot_description" value="false"/>
   </include>
+  <include file="$(find panda_moveit_config)/launch/ros_controllers.launch" pass_all_args="true"></include>
 </launch>

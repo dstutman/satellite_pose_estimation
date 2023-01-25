@@ -30,6 +30,8 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.transforms import functional as F
 
+import albumentations as A
+
 
 class ClassDataset(Dataset):
     """
@@ -93,7 +95,7 @@ class ClassDataset(Dataset):
             # [obj1_kp1, obj1_kp2, obj2_kp1, obj2_kp2, obj3_kp1, obj3_kp2], where each keypoint is in [x, y]-format
             # Then we need to convert it to the following list:
             # [[obj1_kp1, obj1_kp2], [obj2_kp1, obj2_kp2], [obj3_kp1, obj3_kp2]]
-            keypoints_transformed_unflattened = np.reshape(np.array(transformed['keypoints']), (-1,8,2)).tolist()
+            keypoints_transformed_unflattened = np.reshape(np.array(transformed['keypoints']), (-1,4,2)).tolist()
 
             # Converting transformed keypoints from [x, y]-format to [x,y,visibility]-format by appending original visibilities to transformed coordinates of keypoints
             keypoints = []
@@ -143,6 +145,29 @@ class ClassDataset(Dataset):
     
     def __len__(self):
         return len(self.imgs_files)
+
+def test_transform():
+    """
+    Function for composing the transforms for testing images. This is just resizing each image to be
+    1440 x 1080 in this case.
+  
+    Parameters:
+    None
+  
+    Returns:
+    A.Compose(): returns sequence of transformations consisting of normalization, random rotation, and the 
+                 associated transformations of keypoints and bounding boxes.
+  
+    """   
+    return A.Compose([
+        A.Sequential([
+            A.augmentations.geometric.resize.LongestMaxSize(max_size=1440, interpolation=cv2.INTER_LINEAR, always_apply=True, p=1),         
+        ], p=1)
+    ],
+    keypoint_params=A.KeypointParams(format='xy'), # More about keypoint formats used in albumentations library read at https://albumentations.ai/docs/getting_started/keypoints_augmentation/
+    bbox_params=A.BboxParams(format='pascal_voc', label_fields=['bboxes_labels']) # Bboxes should have labels, read more here https://albumentations.ai/docs/getting_started/bounding_boxes_augmentation/
+    )   
+
 
 def get_model(num_keypoints, weights_path=None):
     """
@@ -281,7 +306,10 @@ def eval_metrics(bboxes, keypoints, img_name):
     scale = 1.0
 
     # Load in ground truth image along with bounding boxes and keypoints
-    ground_truth = "test_dataset/annotations/" + str(img_name[:-4]) + ".json"
+    if img_name[-4] == ".":
+        ground_truth = "test_dataset/annotations/" + str(img_name[:-4]) + ".json"
+    else: 
+        ground_truth = "test_dataset/annotations/" + str(img_name[:-5]) + ".json"    
     with open(ground_truth, 'r') as f:
         data = json.load(f)
         bbox_gt = data['bboxes']
@@ -372,7 +400,8 @@ def save_output(keypoints, img_name):
     None
   
     """
-    kp_out = {'img_name': img_name,
+    camera_name = 'Daheng' if img_name[-5] == "." else 'Phone'
+    kp_out = {'img_name': img_name, 'camera_name': camera_name, 
     'keypoints': keypoints}
     outfile = 'outputs/' + str(img_name) + '.json'
     with open(outfile, 'w') as f:
@@ -391,13 +420,13 @@ num_iter = 10
 for idx in range(0, num_iter):
     # Testing dataset root folder path
     KEYPOINTS_FOLDER_TEST = 'test_dataset'
-    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=None, demo=False)
+    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=False)
     data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # Change the weights_path based on which one you would like to load in for evaluation.
-    model = get_model(num_keypoints = 8, weights_path='keypointsrcnn_weights.pth')
+    model = get_model(num_keypoints = 4, weights_path='keypointsrcnn_weights.pth')
     model.to(device)
 
 #################################################################################################################
@@ -421,7 +450,7 @@ for idx in range(0, num_iter):
 
     distinct = False
     while distinct == False:
-        if not boxOverlap(np.array(output[0]['boxes'][high_scores_idxs[0]]), np.array(output[0]['boxes'][high_scores_idxs[1]])):
+        if not boxOverlap(np.array(output[0]['boxes'][high_scores_idxs[0]].detach().cpu().numpy()), np.array(output[0]['boxes'][high_scores_idxs[1]].detach().cpu().numpy())):
             distinct = True
 
         else:
@@ -456,6 +485,8 @@ for idx in range(0, num_iter):
     iou_list.append(iou)
     oks_list.append(oks)
     dist_list.append(min(np.nanmean(dist), np.nanmean(dist_shuffle)))
+
+    save_output(keypoints, dataset_test.img_name)
 
 for i in range(0, num_iter):
     print("IOU " + str(i) + ": " + str(iou_list[i]))

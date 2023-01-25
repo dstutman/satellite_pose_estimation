@@ -209,7 +209,7 @@ def resize_transform_obj(img,
 
     keypoints_t = []
     
-    keypoints_transformed_unflattened = np.reshape(np.array(keypoints_2_t), (-1,8,2)).tolist()
+    keypoints_transformed_unflattened = np.reshape(np.array(keypoints_2_t), (-1,4,2)).tolist()
 
     # Converting transformed keypoints from [x, y]-format to [x,y,visibility]-format by appending original visibilities to transformed coordinates of keypoints
     for o_idx, obj in enumerate(keypoints_transformed_unflattened): # Iterating over objects
@@ -263,7 +263,7 @@ def add_obj(img_comp, mask_comp, keypoints_comp, bboxes_comp, img, mask, keypoin
     # add the transformed keypoint (relative to composition grid)
     keypoints_comp.append([[kp[0] + x, kp[1] + y] for kp in keypoints_2])
 
-    keypoints_comp_unflattened = np.reshape(np.array(keypoints_comp), (-1,8,2)).tolist()
+    keypoints_comp_unflattened = np.reshape(np.array(keypoints_comp), (-1,4,2)).tolist()
     keypoints_comp = []
 
     # Converting transformed keypoints from [x, y]-format to [x,y,visibility]-format by appending original visibilities to transformed coordinates of keypoints
@@ -479,7 +479,8 @@ transforms_obj = A.Compose([
 keypoint_params=A.KeypointParams(format='xy'),
 bbox_params=A.BboxParams(format='pascal_voc', label_fields=['bboxes_labels']))
 
-generate_dataset(100, folder='synthetic_dataset', split='train')
+# generate_dataset(817, folder='synthetic_dataset', split='train')
+generate_dataset(69, folder='synthetic_dataset', split='test')
 
 #################################################################################################################
 ###################################### END OF ADJUSTABLE PARAMETERS #############################################

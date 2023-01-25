@@ -109,7 +109,7 @@ class ClassDataset(Dataset):
             # [obj1_kp1, obj1_kp2, obj2_kp1, obj2_kp2, obj3_kp1, obj3_kp2], where each keypoint is in [x, y]-format
             # Then we need to convert it to the following list:
             # [[obj1_kp1, obj1_kp2], [obj2_kp1, obj2_kp2], [obj3_kp1, obj3_kp2]]
-            keypoints_transformed_unflattened = np.reshape(np.array(transformed['keypoints']), (-1,8,2)).tolist()
+            keypoints_transformed_unflattened = np.reshape(np.array(transformed['keypoints']), (-1,4,2)).tolist()
 
             # Converting transformed keypoints from [x, y]-format to [x,y,visibility]-format by appending original visibilities to transformed coordinates of keypoints
             keypoints = []
@@ -175,8 +175,9 @@ def train_transform():
     """
     return A.Compose([
         A.Sequential([
+            A.augmentations.geometric.resize.LongestMaxSize(max_size=1440, interpolation=cv2.INTER_LINEAR, always_apply=True, p=1),
             A.RandomRotate90(p=1), # Random rotation of an image by 90 degrees zero or more times
-            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0) # Normalizing the dataset using ImageNet statistics.
+            # A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0) # Normalizing the dataset using ImageNet statistics.
             # A.RandomBrightnessContrast(brightness_limit=0.3, contrast_limit=0.3, brightness_by_max=True, always_apply=False, p=1), # Random change of brightness & contrast
         ], p=1)
     ],
@@ -308,106 +309,109 @@ def get_model(num_keypoints, weights_path=None):
         
     return model
 
-# Use multi-processing if available to reduce training time
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+if __name__ == '__main__':
+    # Some preamble to ensure there is enough GPU memory (RAM) allocated for Pytorch.
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = 'max_split_size_mb:512'
+    torch.cuda.device_count()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    # Use multi-processing if available to reduce training time
+    device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
-#################################################################################################################
-######################################### ADJUSTABLE PARAMETERS #################################################
-#################################################################################################################  
 
-# Specify the relative path of the training and testing datasets.
-KEYPOINTS_FOLDER_TRAIN = 'train_dataset_single'
-KEYPOINTS_FOLDER_TEST = 'test_dataset_single'
+    #################################################################################################################
+    ######################################### ADJUSTABLE PARAMETERS #################################################
+    #################################################################################################################  
 
-# Initialize the datasets for the training and testing sets. Set demo=True if transform visualization features are
-# desired.
-dataset_train = ClassDataset(KEYPOINTS_FOLDER_TRAIN, transform=train_transform(), demo=False)
-dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=None, demo=False)
+    # Specify the relative path of the training and testing datasets.
+    KEYPOINTS_FOLDER_TRAIN = 'train_dataset'
+    KEYPOINTS_FOLDER_TEST = 'test_dataset'
 
-# Load in images to train and evaluate the network. Here, the batch_size (the number of images loaded into the
-# network at a time) can be adjusted here if desired.
-# The datasets can also be not shuffled if that is desired by using shuffle=False.
-data_loader_train = DataLoader(dataset_train, batch_size=5, shuffle=True, collate_fn=collate_fn)
-data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
+    # Initialize the datasets for the training and testing sets. Set demo=True if transform visualization features are
+    # desired.
+    dataset_train = ClassDataset(KEYPOINTS_FOLDER_TRAIN, transform=train_transform(), demo=False)
+    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=None, demo=False)
 
-# Initialize the model with the correct number of keypoints. This number can be adjusted based on the dataset 
-# being passed in.
-model = get_model(num_keypoints = 8)
-model.to(device)
+    # Load in images to train and evaluate the network. Here, the batch_size (the number of images loaded into the
+    # network at a time) can be adjusted here if desired.
+    # The datasets can also be not shuffled if that is desired by using shuffle=False.
+    data_loader_train = DataLoader(dataset_train, batch_size=1, shuffle=True, num_workers=4, collate_fn=collate_fn)
+    data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=4, collate_fn=collate_fn)
 
-# Network parameters that can be varied to adjust performance of the optimizer and the learning rate scheduler.
-# lr: The learning rate, in stochastic gradient descent, refers to how drastically the model will adjust 
-#     parameters to reach a certain optimum. A low learning rate may never reach optimum or get trapped in a
-#     local optimum, while a high one may pass over optima and provide unpredictable behaviour.
-# momentum: Momentum takes advantage of the model's progression towards a minima to help it reach that target
-#           faster and make the descent more predictable. This value likely does not need to be changed.
-# weight_decay: Penalizes the model for getting too complex and overfitting the training data. This likely
-#               does not need to be changed.
-# step_size: The LR scheduler method adjusts the learning rate after a certain amount of epochs to better adapt
-#            to the problem as its knowledge gets more refined and it nears an optimum. Step size is the number
-#            of epochs after which the learning rate should be dropped.
-# gamma: This refers to the proportion at which the learning rate should be dropped.
-# num_epochs: Total number of epochs to train the model. An epoch is complete once the network has done one iteration
-#             of learning on the training set. More epochs is generally good for better performance, but takes
-#             much more time to train.
-
-params = [p for p in model.parameters() if p.requires_grad]
-optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
-num_epochs = 5
-
-#################################################################################################################
-###################################### END OF ADJUSTABLE PARAMETERS #############################################
-#################################################################################################################  
-
-training_loss = []
-
-# Training and evaluation loop. Most of the neural network magic happens in these four lines, with a lot under the hood.
-for epoch in range(num_epochs):
-    metric_logger = train_one_epoch(model, optimizer, data_loader_train, device, epoch, print_freq=10)
-    training_loss.append(metric_logger.meters["loss_keypoint"].global_avg)
-    lr_scheduler.step()
-    evaluate(model, data_loader_test, device)
-
-    
-# Save model weights after training. Change this path or the currently saved file if you do not wish to overwrite the 
-# previously saved weights.
-torch.save(model.state_dict(), 'keypointsrcnn_weights.pth')
-
-# Plot the training loss
-plot_results(num_epochs, training_loss)
-
-# This code can also be used to get an initial view of how your network will evaluate images. A better analysis can be
-# done in evaluate.py.
-iterator = iter(data_loader_test)
-images, targets = next(iterator)
-images = list(image.to(device) for image in images)
-
-# Evaluate the images using the model and record its output.
-with torch.no_grad():
+    # Initialize the model with the correct number of keypoints (counted per bounding box). This number can be adjusted 
+    # based on the dataset being passed in.
+    model = get_model(num_keypoints = 4)
     model.to(device)
-    model.eval()
-    output = model(images)
 
-print("Predictions: \n", output)
-image = (images[0].permute(1,2,0).detach().cpu().numpy() * 255).astype(np.uint8)
-scores = output[0]['scores'].detach().cpu().numpy()
+    # Network parameters that can be varied to adjust performance of the optimizer and the learning rate scheduler.
+    # lr: The learning rate, in stochastic gradient descent, refers to how drastically the model will adjust 
+    #     parameters to reach a certain optimum. A low learning rate may never reach optimum or get trapped in a
+    #     local optimum, while a high one may pass over optima and provide unpredictable behaviour.
+    # momentum: Momentum takes advantage of the model's progression towards a minima to help it reach that target
+    #           faster and make the descent more predictable. This value likely does not need to be changed.
+    # weight_decay: Penalizes the model for getting too complex and overfitting the training data. This likely
+    #               does not need to be changed.
+    # step_size: The LR scheduler method adjusts the learning rate after a certain amount of epochs to better adapt
+    #            to the problem as its knowledge gets more refined and it nears an optimum. Step size is the number
+    #            of epochs after which the learning rate should be dropped.
+    # gamma: This refers to the proportion at which the learning rate should be dropped.
+    # num_epochs: Total number of epochs to train the model. An epoch is complete once the network has done one iteration
+    #             of learning on the training set. More epochs is generally good for better performance, but takes
+    #             much more time to train.
 
-# Choose the bounding boxes corresponding to the two highest confidence scores of the network.
-high_scores_idxs = nlargest(2, range(len(scores)), key=lambda idx: scores[idx])
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.SGD(params, lr=0.001, momentum=0.9, weight_decay=0.0005)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.3)
+    num_epochs = 20
+    #################################################################################################################
+    ###################################### END OF ADJUSTABLE PARAMETERS #############################################
+    #################################################################################################################  
 
-keypoints = []
-# Save the keypoints in a format so that they can be visualized.
-for kps in output[0]['keypoints'][high_scores_idxs].detach().cpu().numpy():
-    keypoints.append([list(map(int, kp)) for kp in kps])
+    training_loss = []
 
-bboxes = []
-# Save the bounding boxes in a format so that they can be visualized.
-for bbox in output[0]['boxes'][high_scores_idxs].detach().cpu().numpy():
-    bboxes.append(list(map(int, bbox.tolist())))
-    
-# Visualize a sample network prediction.
-visualize(image, bboxes, keypoints)
+    # Training and evaluation loop. Most of the neural network magic happens in these four lines, with a lot under the hood.
+    for epoch in range(num_epochs):
+        metric_logger = train_one_epoch(model, optimizer, data_loader_train, device, epoch, print_freq=10)
+        training_loss.append(metric_logger.meters["loss_keypoint"].global_avg)
+        lr_scheduler.step()
+        evaluate(model, data_loader_test, device)
 
+        
+    # Save model weights after training. Change this path or the currently saved file if you do not wish to overwrite the 
+    # previously saved weights.
+    torch.save(model.state_dict(), 'keypointsrcnn_weights.pth')
 
+    # Plot the training loss
+    plot_results(num_epochs, training_loss)
 
+    # This code can also be used to get an initial view of how your network will evaluate images. A better analysis can be
+    # done in evaluate.py.
+    iterator = iter(data_loader_test)
+    images, targets = next(iterator)
+    images = list(image.to(device) for image in images)
+
+    # Evaluate the images using the model and record its output.
+    with torch.no_grad():
+        model.to(device)
+        model.eval()
+        output = model(images)
+
+    print("Predictions: \n", output)
+    image = (images[0].permute(1,2,0).detach().cpu().numpy() * 255).astype(np.uint8)
+    scores = output[0]['scores'].detach().cpu().numpy()
+
+    # Choose the bounding boxes corresponding to the two highest confidence scores of the network.
+    high_scores_idxs = nlargest(2, range(len(scores)), key=lambda idx: scores[idx])
+
+    keypoints = []
+    # Save the keypoints in a format so that they can be visualized.
+    for kps in output[0]['keypoints'][high_scores_idxs].detach().cpu().numpy():
+        keypoints.append([list(map(int, kp)) for kp in kps])
+
+    bboxes = []
+    # Save the bounding boxes in a format so that they can be visualized.
+    for bbox in output[0]['boxes'][high_scores_idxs].detach().cpu().numpy():
+        bboxes.append(list(map(int, bbox.tolist())))
+        
+    # Visualize a sample network prediction.
+    visualize(image, bboxes, keypoints)

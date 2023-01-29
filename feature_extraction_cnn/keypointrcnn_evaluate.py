@@ -22,9 +22,11 @@ import matplotlib.pyplot as plt
 import cv2
 import os, json
 import PIL
+import time
 
 from heapq import nlargest
 from utils import collate_fn
+from engine import evaluate
 
 from torch.utils.data import Dataset, DataLoader
 from torchvision.models.detection.rpn import AnchorGenerator
@@ -48,10 +50,11 @@ class ClassDataset(Dataset):
                        locations for the image of interest.
   
     """
-    def __init__(self, root, transform=None, demo=False):                
+    def __init__(self, root, transform=None, demo=False, original=False):                
         self.root = root
         self.transform = transform
         self.demo = demo # Use demo=True if you need transformed and original images (for example, for visualization purposes)
+        self.original = original  
 
         # Ensure that your testing dataset images are stored under respective folders called "images" and "annotations".
         self.imgs_files = sorted(os.listdir(os.path.join(root, "images")))
@@ -60,8 +63,18 @@ class ClassDataset(Dataset):
     # Function to get and prepare an image for use in the model.
     def __getitem__(self, idx):
         img_path = os.path.join(self.root, "images", self.imgs_files[idx])
-        annotations_path = os.path.join(self.root, "annotations", self.annotations_files[idx])
         self.img_name = self.imgs_files[idx]
+        if not self.demo: 
+            annotations_name = img_path.split("\\")[2].split(".")[0] + ".json"
+            annotations_path = os.path.join(self.root, "annotations", annotations_name)
+            with open(annotations_path, 'w') as f:
+                kp_out = {'img_name': annotations_name, 'bboxes': [[0, 0, 1, 1], [0, 0, 1, 1]], 
+                        'keypoints': [[[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]]}
+                json.dump(kp_out, f)
+
+        if self.demo: 
+            annotations_path = os.path.join(self.root, "annotations", self.annotations_files[idx])
+            
 
         # Python Image Library is used here to open the image of choice rather than OpenCV because OpenCV flips the RGB color
         # channels to BGR and flips H and W of the image. Opening those files was inconsistent and would throw errors.
@@ -138,7 +151,7 @@ class ClassDataset(Dataset):
         target_original["keypoints"] = torch.as_tensor(keypoints_original, dtype=torch.float32)        
         img_original = F.to_tensor(img_original)
 
-        if self.demo:
+        if self.original:
             return img, target, img_original, target_original
         else:
             return img, target
@@ -410,17 +423,21 @@ def save_output(keypoints, img_name):
 iou_list = []
 oks_list = []
 dist_list = []
+time_total_list = []
 
 #################################################################################################################
 ######################################### ADJUSTABLE PARAMETERS #################################################
 ################################################################################################################# 
 
 num_iter = 10 
+holistic_metrics = False # Set to true if you want holistic metrics for OKS and IOU.
+demo = False   # Set to False if you want to run the program without requiring annotation inputs.
+original = False # This is for the training code. Keeping this false is the safer option.  
 
 for idx in range(0, num_iter):
     # Testing dataset root folder path
     KEYPOINTS_FOLDER_TEST = 'test_dataset'
-    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=False)
+    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=demo, original=original)
     data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -437,10 +454,18 @@ for idx in range(0, num_iter):
     images, targets = next(iterator)
     images = list(image.to(device) for image in images)
 
+    if holistic_metrics == True:
+        evaluate(model, data_loader_test, device)
+
+    time_start = time.time()
     with torch.no_grad():
         model.to(device)
         model.eval()
-        output = model(images)
+        output = model(images)    
+    time_end = time.time()
+    time_total = time_end - time_start
+    time_total_list.append(time_total) 
+    print('Elapsed Time: ' + str(time_total))   
 
     print("Predictions: \n", output)
     image = (images[0].permute(1,2,0).detach().cpu().numpy() * 255).astype(np.uint8)

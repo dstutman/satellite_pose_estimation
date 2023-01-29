@@ -58,6 +58,8 @@ class ClassDataset(Dataset):
 
         # Ensure that your testing dataset images are stored under respective folders called "images" and "annotations".
         self.imgs_files = sorted(os.listdir(os.path.join(root, "images")))
+        if not os.path.exists(os.path.join(root, "annotations")):
+                os.mkdir(os.path.join(root, "annotations"))
         self.annotations_files = sorted(os.listdir(os.path.join(root, "annotations")))
     
     # Function to get and prepare an image for use in the model.
@@ -301,15 +303,16 @@ def boxOverlap(box1, box2):
     isOverlapping = (box1[0] < box2[2] and box2[0] < box1[2] and box1[1] < box2[3] and box2[1] < box1[3])
     return isOverlapping
 
-def eval_metrics(bboxes, keypoints, img_name):
+def eval_metrics(bboxes, keypoints, root, img_name):
     """
     Function for computing IOU, OKS, and distance metrics
   
     Parameters:
     bboxes (np.array): Bounding box prediction coordinates, each in format [x1, y1, x2, y2].
     keypoints (np.array): Keypoint prediction coordinates, each in format [x, y, visibility]
+    root (str): Root of the file being evaluated
     img_name (str): Name of the image being evaluated.
-    
+        
     Returns:
     isOverlapping (bool): True if boxes overlap, and False if not.
   
@@ -320,9 +323,9 @@ def eval_metrics(bboxes, keypoints, img_name):
 
     # Load in ground truth image along with bounding boxes and keypoints
     if img_name[-4] == ".":
-        ground_truth = "test_dataset/annotations/" + str(img_name[:-4]) + ".json"
+        ground_truth = root + "/annotations/" + str(img_name[:-4]) + ".json"
     else: 
-        ground_truth = "test_dataset/annotations/" + str(img_name[:-5]) + ".json"    
+        ground_truth = root + "/annotations/" + str(img_name[:-5]) + ".json"    
     with open(ground_truth, 'r') as f:
         data = json.load(f)
         bbox_gt = data['bboxes']
@@ -416,6 +419,8 @@ def save_output(keypoints, img_name):
     camera_name = 'Daheng' if img_name[-5] == "." else 'Phone'
     kp_out = {'img_name': img_name, 'camera_name': camera_name, 
     'keypoints': keypoints}
+    if not os.path.exists("outputs"):
+        os.mkdir("outputs")
     outfile = 'outputs/' + str(img_name) + '.json'
     with open(outfile, 'w') as f:
         json.dump(kp_out, f)
@@ -436,7 +441,7 @@ original = False # This is for the training code. Keeping this false is the safe
 
 for idx in range(0, num_iter):
     # Testing dataset root folder path
-    KEYPOINTS_FOLDER_TEST = 'test_dataset'
+    KEYPOINTS_FOLDER_TEST = 'jan 26 ground truth-20230129T230051Z-001'
     dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=demo, original=original)
     data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
 
@@ -505,7 +510,7 @@ for idx in range(0, num_iter):
 
     visualize(image, bboxes, keypoints, dataset_test.img_name)
 
-    iou, oks, dist, dist_shuffle = eval_metrics(bboxes, keypoints, dataset_test.img_name)
+    iou, oks, dist, dist_shuffle = eval_metrics(bboxes, keypoints, root=KEYPOINTS_FOLDER_TEST, img_name=dataset_test.img_name)
 
     iou_list.append(iou)
     oks_list.append(oks)

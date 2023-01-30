@@ -303,6 +303,21 @@ def boxOverlap(box1, box2):
     isOverlapping = (box1[0] < box2[2] and box2[0] < box1[2] and box1[1] < box2[3] and box2[1] < box1[3])
     return isOverlapping
 
+def boxIdentical(box1, box2):
+    """
+    Function for testing if two bounding boxes are identical.
+  
+    Parameters:
+    box1 (np.array): Bounding box 1 top left and bottom right coordinates written as [x1, y1, x2, y2].
+    box2 (np.array): Bounding box 2 top left and bottom right coordinates written as [x1, y1, x2, y2].
+    
+    Returns:
+    isIdentical (bool): True if boxes are identical, and False if not.
+  
+    """  
+    isIdentical = (box1[0] == box2[0] and box1[1] == box2[1] and box1[2] == box2[2] and box1[3] == box2[3]) 
+    return isIdentical
+
 def eval_metrics(bboxes, keypoints, root, img_name):
     """
     Function for computing IOU, OKS, and distance metrics
@@ -479,34 +494,40 @@ for idx in range(0, num_iter):
     high_scores_idxs = nlargest(2, range(len(scores)), key=lambda idx: scores[idx])
 
     distinct = False
+    single_valid = False
     while distinct == False:
-        if not boxOverlap(np.array(output[0]['boxes'][high_scores_idxs[0]].detach().cpu().numpy()), np.array(output[0]['boxes'][high_scores_idxs[1]].detach().cpu().numpy())):
+        if not boxOverlap(np.array(output[0]['boxes'][high_scores_idxs[0]].detach().cpu().numpy()), np.array(output[0]['boxes'][high_scores_idxs[1]].detach().cpu().numpy())) and not boxIdentical(np.array(output[0]['boxes'][high_scores_idxs[0]].detach().cpu().numpy()), np.array(output[0]['boxes'][high_scores_idxs[1]].detach().cpu().numpy())):
             distinct = True
 
         else:
             high_scores_idxs[1] += 1
-            if (high_scores_idxs[1] == len(output[0]['boxes'])) or (output[0]['scores'][high_scores_idxs[1]] < 0.2):
-                high_scores_idxs[1] = 0
+            if (high_scores_idxs[1] == len(output[0]['boxes'])) or (output[0]['scores'][high_scores_idxs[1]] < 0.7):
+                single_valid = True
+                high_scores_idxs = [high_scores_idxs[0]]
                 break
 
     keypoints = []
     for kps in output[0]['keypoints'][high_scores_idxs].detach().cpu().numpy():
         keypoints.append([list(map(int, kp)) for kp in kps])
+        if single_valid == True:
+            keypoints.append([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]) 
 
-    for bb_num, bb in enumerate(keypoints):
-        for i in range(0, len(bb)-1):
-            for j in range(i+1, len(bb)):
-                kp_diff = np.subtract(np.array(bb[i][:2]), np.array(bb[j][:2]))
+    for bb_num in range(0, len(high_scores_idxs)):
+        for i in range(0, len(keypoints[bb_num])-1):
+            for j in range(i+1, len(keypoints[bb_num])):
+                kp_diff = np.subtract(np.array(keypoints[bb_num][i][:2]), np.array(keypoints[bb_num][j][:2]))
                 if np.linalg.norm(kp_diff) < 25:
                     if abs(output[0]['keypoints_scores'][high_scores_idxs][bb_num][i]) > abs(output[0]['keypoints_scores'][high_scores_idxs][bb_num][j]):
-                        bb[j][0], bb[j][1], bb[j][2] = 0, 0, 0
+                        keypoints[bb_num][j][0], keypoints[bb_num][j][1], keypoints[bb_num][j][2] = 0, 0, 0
                     else:
-                        bb[i][0], bb[i][1], bb[i][2] = 0, 0, 0
+                        keypoints[bb_num][i][0], keypoints[bb_num][i][1], keypoints[bb_num][i][2] = 0, 0, 0
 
 
     bboxes = []
     for bbox in output[0]['boxes'][high_scores_idxs].detach().cpu().numpy():
         bboxes.append(list(map(int, bbox.tolist())))
+        if single_valid == True:
+            bboxes.append([0, 0, 1, 1]) 
 
     visualize(image, bboxes, keypoints, dataset_test.img_name)
 

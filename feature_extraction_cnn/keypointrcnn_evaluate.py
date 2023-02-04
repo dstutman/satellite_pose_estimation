@@ -451,26 +451,27 @@ time_total_list = []
 
 num_iter = 10 
 holistic_metrics = False # Set to true if you want holistic metrics for OKS and IOU.
-demo = False   # Set to False if you want to run the program without requiring annotation inputs.
-original = False # This is for the training code. Keeping this false is the safer option.  
+demo = True   # Set to False if you want to run the program without requiring annotation inputs.
+original = False # This is for the training code. Keeping this false is the safer option. 
 
-for idx in range(0, num_iter):
-    # Testing dataset root folder path
-    KEYPOINTS_FOLDER_TEST = 'jan 26 ground truth-20230129T230051Z-001'
-    dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=demo, original=original)
-    data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=True, collate_fn=collate_fn)
+# Testing dataset root folder path
+KEYPOINTS_FOLDER_TEST = 'test_dataset'
+dataset_test = ClassDataset(KEYPOINTS_FOLDER_TEST, transform=test_transform(), demo=demo, original=original)
+data_loader_test = DataLoader(dataset_test, batch_size=1, shuffle=False, collate_fn=collate_fn)
 
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-    # Change the weights_path based on which one you would like to load in for evaluation.
-    model = get_model(num_keypoints = 4, weights_path='keypointsrcnn_weights.pth')
-    model.to(device)
-
+# Change the weights_path based on which one you would like to load in for evaluation.
+model = get_model(num_keypoints = 4, weights_path='keypointsrcnn_weights_2.pth')
+model.to(device)
+iterator = iter(data_loader_test)
 #################################################################################################################
 ###################################### END OF ADJUSTABLE PARAMETERS #############################################
 ################################################################################################################# 
 
-    iterator = iter(data_loader_test)
+for idx in range(0, num_iter):
+
+    
     images, targets = next(iterator)
     images = list(image.to(device) for image in images)
 
@@ -501,7 +502,7 @@ for idx in range(0, num_iter):
 
         else:
             high_scores_idxs[1] += 1
-            if (high_scores_idxs[1] == len(output[0]['boxes'])) or (output[0]['scores'][high_scores_idxs[1]] < 0.7):
+            if (high_scores_idxs[1] == len(output[0]['boxes'])) or (output[0]['scores'][high_scores_idxs[1]] < 0.8):
                 single_valid = True
                 high_scores_idxs = [high_scores_idxs[0]]
                 break

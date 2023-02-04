@@ -539,8 +539,3 @@ for idx in range(0, num_iter):
     dist_list.append(min(np.nanmean(dist), np.nanmean(dist_shuffle)))
 
     save_output(keypoints, dataset_test.img_name)
-
-for i in range(0, num_iter):
-    print("IOU " + str(i) + ": " + str(iou_list[i]))
-    print("OKS " + str(i) + ": " + str(oks_list[i]))
-    print("Mean distance " + str(i) + ": " + str(dist_list[i]))

@@ -1,22 +1,12 @@
-### How to use the CNN for pose estimation ###
+### Feature Extraction CNN Implementation ###
 
-* Setup
-- Pull the `dev_fe` branch.
-- Go to the Google Drive and download  `Images Series/CNN Testing Dataset/`. 
-- Save the folders `annotations/` and `images/` to a folder called `test_dataset`
-  in your root folder (i.e. `satellite_pose_estimation/test_dataset` is the 
-  correct path.)
-- Back in the Google Drive, download `keypointsrcnn_weights.pth`. Save it again 
-  to the root folder of `satellite_pose_estimation`. 
+This folder contains the CNN implementation for feature extraction of the Delfi-n3xt satellite.
 
-* Evaluation
-- In `evaluate.py`, you can just run the code. The evaluator actually evaluates every
-  image in the testing dataset because I am trying to measure precision and recall
-  scores, but that feature is not currently working.
-- What is working is the output of the testing image and its keypoints. 
-- Right now I have it set to shuffle the dataset, and whatever the last image is is what
-  will be uploaded.
-    - If you need a specific image you could put it in another folder for now and change 
-      the 'KEYPOINTS_FOLDER_TEST' variable on line 214 to that folder name. There will 
-      be a better method for the online evaluation, this file is more for diagnostics 
-      at the moment. 
+The files `coco_eval.py`, `coco_utils.py`, `engine.py`, `group_by_aspect_ratio.py`, `presets.py`, `transforms.py`, and `utils.py` are all sourced from the Python COCO tools repository with some minor changes for the Delfi-n3xt dataset.
+
+- `keypointrcnn_evaluate.py`: This script predicts keypoint and bounding box locations on an inputted testing image, including detection metrics.
+- `keypointrcnn_train.py`: This script trains the CNN on an inputted training dataset.
+- `dataset_annotation_keypoint.py`: This script generates the manually generated dataset annotations.
+- `synthetic_generator.py`: This script generates random synthetic images of the satellite on various space environment backgrounds.
+
+The CNN requires a training and testing dataset to run, which are not provided in this repository. It could also be run on a custom dataset with some modifications.
